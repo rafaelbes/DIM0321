@@ -1,3 +1,69 @@
+#!/bin/bash
+
+declare -A numTesteAtual
+declare -A statusQuestao
+
+#bg: 40 a 47, 100 a 107
+#0;fg;bg
+vermelho='\033[0;31m'
+verde='\033[0;32m'
+normal='\033[0m'
+azul='\033[0;36m'
+corProblema='\033[1;97;44m'
+
+args=("$@")
+ls $1
+avaliar () {
+	file=${args[0]}$1
+	if ! [ -n "${numTesteAtual[$1]}" ]; then
+		echo -e "${corProblema}              problema $1            ${normal}"
+	fi
+	numTesteAtual[$1]=$((numTesteAtual[$1]+1))
+	if [ -f $file.c ]; then
+		if [ ! -f exec$1 ]; then
+			arq=$file.c
+			if command -v file &> /dev/null && command -v iconv &> /dev/null; then
+				charset="$(file -bi "$file.c" | awk -F "=" '{print $2}')"
+				if [ "$charset" != utf-8 ]; then
+					iconv -f "$charset" -t utf8 "$file.c" -o tmp.c
+					arq=tmp.c
+				fi
+			fi
+			if ! gcc "$arq" -o exec$1 -lm  2> /dev/null; then
+				if ! [ -n "${statusQuestao[$1]}" ]; then
+					statusQuestao[$1]='código '$file.c' não compila'
+					echo -e "${vermelho} ${statusQuestao[$1]} ${normal}"
+				fi
+			fi
+		fi
+		echo -e "$2" > input
+		echo -e "$3" > gabarito
+		if [ -f exec$1 ]; then
+			timeout 2 ./exec$1 < input > output
+			printf 'Teste %d: ' ${numTesteAtual[$1]}
+			if ! diff -wB output gabarito > /dev/null; then
+				echo -e "${vermelho} [x]${normal}"
+				echo -e '\tEntrada:' "${azul} $2 ${normal}"
+				echo -e '\tSaída do seu programa:' "${azul} $(cat output) ${normal}"
+				echo -e '\tSaída esperada       :' "${azul} $3 ${normal}"
+			else
+				echo -e "${verde} [ok] ${normal}"
+			fi
+		fi
+	else
+		if ! [ -n "${statusQuestao[$1]}" ]; then
+			statusQuestao[$1]='código '$file.c' não existe'
+			echo -e "${vermelho} ${statusQuestao[$1]} ${normal}"
+		fi
+	fi
+}
+
+if [ -e tmp.c ]; then echo "Existe um diretório/arquivo tmp.c, abortando"; exit 1; fi
+if [ -e gabarito ]; then echo "Existe um diretório/arquivo gabarito, abortando"; exit 1; fi
+if [ -e input ]; then echo "Existe um diretório/arquivo input, abortando"; exit 1; fi
+if [ -e output ]; then echo "Existe um diretório/arquivo output, abortando"; exit 1; fi
+
+
 avaliar 'q1'  '4 1 1 1 1' '1 2 3 4 1'
 avaliar 'q1'  '10 1 2 3 4 5 4 3 2 1 0' '5 5'
 avaliar 'q1'  '5 0 0 0 1 1' '4 5 1'
@@ -53,7 +119,6 @@ avaliar 'q7'  ' 11 -0.26 7.53 -0.69 0.86 -3.96 5.57 -8.67 -2.33 6.47 1.79 9.34 6
 avaliar 'q7'  ' 10 6.78 0.52 -0.71 -3.46 9.66 -9.15 -0.74 7.64 -7.33 9.75 7.04 -2.13 -8.81 1.4 -4.08 6.76 6.87 -7.74 -3.49 0.72 ' 'N'
 avaliar 'q7'  ' 4 0.08 6.69 -3.44 -2.98 -0.05 -4.13 -5.98 -1.12 ' 'N'
 avaliar 'q7'  ' 17 5.27 -5.59 -9.88 -9.91 6.19 8.82 1.55 7.74 4.28 4.43 0.29 1.26 7.98 9.8 -2.24 -9.1 -6.28 3.93 7.7 -8.64 0.45 -4.3 -0.08 9.73 -5.52 -7.14 -3.5 -9.51 -1.11 -7.32 1.23 -4.49 -1.29 -3.24 ' 'S'
-avaliar 'q7' 
 
 avaliar 'q8'  ' 2 -1 4 3 ' ' 1 '
 avaliar 'q8'  ' 3 -4 0 -5 0 ' ' 0 '
@@ -104,3 +169,4 @@ avaliar 'q8'  ' 47 61 86 -58 -47 -67 2 54 36 79 -68 19 64 37 93 -66 -19 57 -66 -
 avaliar 'q8'  ' 48 75 43 65 93 -46 -45 94 -48 -51 8 72 -23 -10 92 29 40 -73 48 -59 -62 -94 37 1 1 -54 -31 -74 -37 -64 28 -53 -78 -19 59 9 52 -39 -90 38 -6 -90 83 28 92 36 24 19 40 81 ' ' 3 '
 avaliar 'q8'  ' 49 -47 -36 -62 -46 -14 28 22 42 -67 55 86 43 75 -95 58 -9 57 96 34 -93 -15 -37 10 -62 34 -65 92 75 -72 -91 9 -97 91 -73 50 78 13 90 16 90 6 -59 -27 29 -12 -48 -31 -49 36 -11 ' ' 3 '
 
+rm tmp.c gabarito input output exec* 2> /dev/null
